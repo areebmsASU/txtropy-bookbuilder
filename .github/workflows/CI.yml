@@ -1,0 +1,19 @@
+name: Lightsail CI
+
+on:
+  push:
+    branches: ["main"]
+
+jobs:
+  push-to-lightsail:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Push to AWS Lightsail
+        run: .github/scripts/push_to_lightsail.sh
+        env:
+          PEM_DECRYPT_PASSPHRASE: ${{ secrets.PEM_DECRYPT_PASSPHRASE }}

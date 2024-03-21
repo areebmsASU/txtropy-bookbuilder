@@ -1,8 +1,8 @@
 # Create and activate virtual Env
 sudo apt-get update
 sudo apt install -y python3.10-venv
-sudo apt install postgresql
-sudo apt install cron
+sudo apt install -y postgresql
+sudo apt install -y cron
 cd /home/ubuntu
 python3 -m venv .venv
 sudo chown -R ubuntu .venv/
@@ -34,8 +34,9 @@ deactivate
 EOF
 chmod +x /home/ubuntu/bookbuilder.git/hooks/post-receive
 
-touch /etc/cron.hourly/run_routine.sh
-cat > /etc/cron.hourly/run_routine.sh <<- "EOF"
+touch /etc/cron.hourly/run_routine
+cat > /etc/cron.hourly/run_routine <<- "EOF"
+#!/bin/bash
 cd ~
 source vars.sh
 source .venv/bin/activate
@@ -43,4 +44,4 @@ cd bookbuilder
 python manage.py scrape_book_data
 echo “Routine completed at $(date)” >> $HOME/log.txt
 EOF
-chmod +x /etc/cron.hourly/run_routine.sh
+chmod +x /etc/cron.hourly/run_routine

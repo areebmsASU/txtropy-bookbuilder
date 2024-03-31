@@ -1,9 +1,10 @@
+from concurrent.futures import ThreadPoolExecutor, wait
+
 from bs4 import BeautifulSoup
 from bs4.element import NavigableString, Tag as bs4Tag, Comment
+from django.db.transaction import atomic
 
 from gutenberg.models import Text, Tag, Chunk, Book
-
-from concurrent.futures import ThreadPoolExecutor, wait
 
 
 class BookCleaner:
@@ -13,11 +14,20 @@ class BookCleaner:
         self.executor_futures = []
         self.chunk_count = 0
 
-    def parse(self):
-        if self.raw_book.body and self.raw_book.html_stylesheet:
+    def parse(self, force=False):
+
+        if force:
+            self.html_stylesheet = None
+            Tag.objects.filter(raw_book=self.raw_book.id).delete()
+            self.raw_book.save(update_fields=["html_stylesheet"])
+
+        elif self.raw_book.body and self.raw_book.html_stylesheet:
             return
 
         html_element = BeautifulSoup(self.raw_book.text, "html.parser").html
+        html_element.find(attrs={"id": "pg-footer"}).decompose()
+        html_element.find(attrs={"id": "pg-header"}).decompose()
+
         self.raw_book.body = Tag.objects.create(
             rel_i=0,
             raw_book=self.raw_book,
@@ -25,32 +35,39 @@ class BookCleaner:
             contents_text=html_element.body.get_text(strip=True, separator=" ") or None,
         )
 
-        for rel_i, child in enumerate(html_element.body.children):
-            self._rec_populate_subcontents(self.raw_book.body, child, rel_i)
-
-        wait(self.executor_futures)
+        tag_by_id = {id(html_element.body): self.raw_book.body}
+        elements = list(html_element.body.find_all())
+        for element in elements:
+            with atomic():
+                tag_by_id[id(element)] = Tag.objects.create(
+                    raw_book_id=self.raw_book.id,
+                    parent=tag_by_id[id(element.parent)],
+                    rel_i=element.parent.contents.index(element),
+                    source_i=element.sourceline,
+                    name=element.name,
+                    attrs=element.attrs or None,
+                    contents_text=element.get_text(strip=True, separator=" ") or None,
+                )
+                for rel_i, child in enumerate(element.contents):
+                    if type(child) is NavigableString:
+                        Text.objects.create(
+                            raw_book_id=self.raw_book.id,
+                            parent=tag_by_id[id(element)],
+                            rel_i=rel_i,
+                            value=child.string,
+                        )
 
         self.raw_book.html_stylesheet = "\r\n".join(
             [s.text for s in html_element.head.findAll("style")]
         )
 
-        self.executor.shutdown()
-        self.executor = ThreadPoolExecutor()
-
-        self.raw_book.save(update_fields=["body", "html_stylesheet"])
-
-        print(
-            len(html_element.body.find_all()) - 1,
-            Tag.objects.filter(raw_book__gutenberg_id=3300).count(),
-        )
-
-        # print(html_element.body.find_all()[0].name)
-        # print(html_element.body.find_all()[0])
-
-        assert (
-            len(html_element.body.find_all())
-            == Tag.objects.filter(raw_book__gutenberg_id=3300).count()
-        )
+        # Checks:
+        element_count = len(html_element.body.find_all()) + 1  # + 1 for body itself
+        tag_count = Tag.objects.filter(raw_book=self.raw_book.id).count()
+        if element_count == tag_count:
+            self.raw_book.save(update_fields=["body", "html_stylesheet"])
+        else:
+            raise Exception(f"Tag-Element mismatch. Elements={element_count}; Tags={tag_count}")
 
     def chunk(self):
         self._rec_get_chunks(self.raw_book.body)
@@ -59,16 +76,14 @@ class BookCleaner:
         self.executor = ThreadPoolExecutor()
 
     def clean(self):
-        html_map_future = self.executor.submit(
-            self._rec_generate_htmlmap, self.raw_book.body
-        )
-        book = Book.objects.create(
+        html_map_future = self.executor.submit(self._rec_generate_htmlmap, self.raw_book.body)
+        book = Book.objects.update_or_create(
             gutenberg_id=self.raw_book.gutenberg_id,
             raw_book=self.raw_book,
             title=self.raw_book.metadata["title"][0].strip(),
             author=self.raw_book.authors.all().first().name,
             html_stylesheet=self.raw_book.html_stylesheet,
-        )
+        )[0]
 
         wait([html_map_future])
         self.executor.shutdown()
@@ -106,44 +121,6 @@ class BookCleaner:
                     data["contents"].append(texts[i].value)
         return data
 
-    def _rec_populate_subcontents(self, parent_tag, element, rel_i):
-        if type(element) is NavigableString:
-            if not str(element.string).replace("\n", "").strip():
-                return
-            Text.objects.create(
-                raw_book_id=parent_tag.raw_book_id,
-                rel_i=rel_i,
-                parent=parent_tag,
-                value=element.string,
-            )
-            return
-
-        if type(element) is Comment:
-            return
-
-        if type(element) is not bs4Tag:
-            raise Exception(str(type(element)))
-
-        tag = Tag.objects.create(
-            parent=parent_tag,
-            rel_i=rel_i,
-            source_i=element.sourceline,
-            raw_book_id=parent_tag.raw_book_id,
-            name=element.name,
-            attrs=element.attrs or None,
-            contents_text=element.get_text(strip=True, separator=" ") or None,
-        )
-
-        for rel_i, content in enumerate(element.contents):
-            self.executor_futures.append(
-                self.executor.submit(
-                    self._rec_populate_subcontents,
-                    parent_tag=tag,
-                    element=content,
-                    rel_i=rel_i,
-                )
-            )
-
     def _rec_get_chunks(self, tag, num_words=None):
         num_words = num_words or len(
             [word for word in " ".join(tag.contents_text.split("\r\n")).split() if word]
@@ -168,9 +145,7 @@ class BookCleaner:
                     subtag_num_words = len(
                         [
                             word
-                            for word in " ".join(
-                                subtag.contents_text.split("\r\n")
-                            ).split()
+                            for word in " ".join(subtag.contents_text.split("\r\n")).split()
                             if word
                         ]
                     )
@@ -187,17 +162,10 @@ class BookCleaner:
                             group_num_words = 0
 
                         self.executor_futures.append(
-                            self.executor.submit(
-                                self._rec_get_chunks, subtag, subtag_num_words
-                            )
+                            self.executor.submit(self._rec_get_chunks, subtag, subtag_num_words)
                         )
 
-                    elif (
-                        round(
-                            (group_num_words + subtag_num_words) / Chunk.CHUNK_SIZE, 2
-                        )
-                        > ratio
-                    ):
+                    elif round((group_num_words + subtag_num_words) / Chunk.CHUNK_SIZE, 2) > ratio:
                         print(
                             tag.id,
                             subtag.id,
@@ -231,9 +199,7 @@ class BookCleaner:
                 lines = texts[0].value.split("\r\n")
                 lines_per_chunk = len(lines) // num_chunks
                 for i in range(num_chunks):
-                    span_text = "\r\n".join(
-                        lines[i * lines_per_chunk : (i + 1) * lines_per_chunk]
-                    )
+                    span_text = "\r\n".join(lines[i * lines_per_chunk : (i + 1) * lines_per_chunk])
 
                     new_tag = tag.tags.create(
                         rel_i=i,

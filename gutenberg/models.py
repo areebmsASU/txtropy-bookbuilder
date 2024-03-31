@@ -57,9 +57,7 @@ class RawBook(models.Model):
         null=True, default=None, choices=SKIPPED_CHOICES, max_length=15
     )
 
-    body = models.ForeignKey(
-        "Tag", on_delete=models.SET_NULL, null=True, related_name="+"
-    )
+    body = models.ForeignKey("Tag", on_delete=models.SET_NULL, null=True, related_name="+")
     html_stylesheet = models.TextField(null=True)
 
     @property
@@ -75,6 +73,9 @@ class RawBook(models.Model):
         self.skipped_reason = reason
         self.save(update_fields=["skipped", "skipped_reason"])
 
+    def __str__(self):
+        return f"Raw Book ({self.gutenberg_id})"
+
 
 class HTMLContent(models.Model):
     raw_book = models.ForeignKey(RawBook, on_delete=models.CASCADE, related_name="+")
@@ -85,9 +86,7 @@ class HTMLContent(models.Model):
 
 
 class Tag(HTMLContent):
-    parent = models.ForeignKey(
-        "Tag", on_delete=models.CASCADE, related_name="tags", null=True
-    )
+    parent = models.ForeignKey("Tag", on_delete=models.CASCADE, related_name="tags", null=True)
     name = models.CharField(max_length=15)
     source_i = models.IntegerField(null=True)  # if Null, injected.
     attrs = models.JSONField(null=True)
@@ -111,9 +110,12 @@ class Book(models.Model):
     html_map = models.JSONField(null=True)
     html_stylesheet = models.TextField(null=True)
 
+    def __str__(self):
+        return f"Book {self.gutenberg_id}: {self.title}"
+
 
 class Chunk(models.Model):
-    CHUNK_SIZE = 150  # words
+    CHUNK_SIZE = 300  # words
     book_gutenberg_id = models.IntegerField()
     text = models.TextField()
     rel_i = models.IntegerField()

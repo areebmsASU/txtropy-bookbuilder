@@ -115,7 +115,7 @@ class Book(models.Model):
 
 
 class Chunk(models.Model):
-    CHUNK_SIZE = 300  # words
+    CHUNK_SIZE = 250  # words
     book_gutenberg_id = models.IntegerField()
     text = models.TextField()
     rel_i = models.IntegerField()

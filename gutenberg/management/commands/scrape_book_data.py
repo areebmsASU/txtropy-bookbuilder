@@ -24,6 +24,7 @@ class Command(BaseCommand):
 
         for raw_book in RawBook.objects.filter(book=None, skipped=False).order_by("gutenberg_id"):
             book_cleaner = BookCleaner(raw_book=raw_book)
+            book_cleaner.refresh()
             book_cleaner.parse()
             print(raw_book.gutenberg_id, "page parsed.")
             book_cleaner.chunk()

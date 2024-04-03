@@ -12,6 +12,8 @@ ALLOWED_HOSTS = []
 
 INSTALLED_APPS = ["gutenberg.apps.GutenbergConfig"]
 
+ROOT_URLCONF = "bookbuilder.urls"
+
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",

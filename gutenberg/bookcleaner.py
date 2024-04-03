@@ -180,7 +180,6 @@ class BookCleaner:
             if subtag_group:
                 self._create_chunk(subtag_group)
         else:
-            print(tag.id, f"No subtags found. Creating new subtags.")
             # create spans and then break into chunks
             text = list(tag.texts.all())
             if len(text) != 1:
@@ -207,7 +206,6 @@ class BookCleaner:
 
                 text.replaced = True
                 text.save(update_fields=["replaced"])
-                print("Chunk", self._create_chunk([new_tag]).id, "was created.")
 
     def _create_chunk(self, tags):
         text = []

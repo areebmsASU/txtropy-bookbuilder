@@ -1,4 +1,6 @@
 from celery import shared_task
+from django.db.models import Count, Exists, OuterRef
+from django.http import JsonResponse
 
 from gutenberg.models import Subject, RawBook, Book, Chunk
 from gutenberg.bookscraper import BookListScraper, BookScraper

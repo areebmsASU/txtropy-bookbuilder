@@ -8,7 +8,7 @@ SECRET_KEY = "django-insecure-6-91u@(y%sy^%nra@gozc@-vhv7u8@2sxas6a5i14#+fol%$kg
 
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ["*"]
 
 INSTALLED_APPS = ["gutenberg.apps.GutenbergConfig"]
 

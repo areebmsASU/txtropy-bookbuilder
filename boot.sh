@@ -32,3 +32,44 @@ pip install -r requirements.txt
 deactivate
 EOF
 chmod +x /home/bitnami/bookbuilder.git/hooks/post-receive
+
+touch /opt/bitnami/apache/conf/vhosts/bookbuilder-http-vhost.conf
+cat > /opt/bitnami/apache/conf/vhosts/bookbuilder-http-vhost.conf <<- "EOF"
+<IfDefine !IS_bookbuilder_LOADED>
+    Define IS_bookbuilder_LOADED
+    WSGIDaemonProcess bookbuilder python-home=/opt/bitnami/python python-path=/home/bitnami/bookbuilder
+</IfDefine>
+<VirtualHost 127.0.0.1:80 _default_:80>
+ServerAlias *
+WSGIProcessGroup bookbuilder
+WSGIScriptAlias / /home/bitnami/bookbuilder/bookbuilder/wsgi.py
+<Directory /home/bitnami/bookbuilder/bookbuilder>
+    <Files wsgi.py>
+    Require all granted
+    </Files>
+</Directory>
+</VirtualHost>
+EOF
+
+touch /opt/bitnami/apache/conf/vhosts/bookbuilder-https-vhost.conf
+cat > /opt/bitnami/apache/conf/vhosts/bookbuilder-https-vhost.conf <<- "EOF"
+<IfDefine !IS_bookbuilder_LOADED>
+    Define IS_bookbuilder_LOADED
+    WSGIDaemonProcess bookbuilder python-home=/opt/bitnami/python python-path=/home/bitnami/bookbuilder
+</IfDefine>
+<VirtualHost 127.0.0.1:443 _default_:443>
+ServerAlias *
+SSLEngine on
+SSLCertificateFile "/opt/bitnami/apache/conf/bitnami/certs/server.crt"
+SSLCertificateKeyFile "/opt/bitnami/apache/conf/bitnami/certs/server.key"
+WSGIProcessGroup bookbuilder
+WSGIScriptAlias / /home/bitnami/bookbuilder/bookbuilder/wsgi.py
+<Directory /home/bitnami/bookbuilder/bookbuilder>
+    <Files wsgi.py>
+    Require all granted
+    </Files>
+</Directory>
+</VirtualHost>
+EOF
+
+sudo /opt/bitnami/ctlscript.sh restart apache

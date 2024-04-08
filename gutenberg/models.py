@@ -116,6 +116,5 @@ class Book(models.Model):
 
 class Chunk(models.Model):
     CHUNK_SIZE = 250  # words
-    book_gutenberg_id = models.IntegerField()
+    raw_book = models.ForeignKey(RawBook, on_delete=models.CASCADE, related_name="chunks")
     text = models.TextField()
-    rel_i = models.IntegerField()

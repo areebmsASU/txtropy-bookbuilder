@@ -30,9 +30,9 @@ def clean_book(gutenberg_id):
 def subjects(request):
     return JsonResponse(
         list(
-            Subject.objects.annotate(raw_book_count=Count("raw_books")).values(
-                "gutenberg_id", "label", "raw_book_count"
-            )
+            Subject.objects.annotate(raw_book_count=Count("raw_books"))
+            .values("gutenberg_id", "label", "raw_book_count")
+            .order_by("-raw_book_count")
         ),
         safe=False,
     )
@@ -42,10 +42,9 @@ def raw_books(request, subject_id):
     data = []
     for raw_book in (
         Subject.objects.get(gutenberg_id=subject_id)
-        .raw_books.annotate(
-            html_chunked=Exists(Chunk.objects.filter(book_gutenberg_id=OuterRef("gutenberg_id")))
-        )
+        .raw_books.annotate(html_chunked=Exists(Chunk.objects.filter(raw_book_id=OuterRef("pk"))))
         .select_related("book")
+        .order_by("gutenberg_id", "skipped")
     ):
         data.append(
             {

@@ -11,6 +11,8 @@ import os
 
 from django.core.wsgi import get_wsgi_application
 
+exec(open("/home/bitnami/vars.py").read())
+
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "bookbuilder.settings")
 
 application = get_wsgi_application()

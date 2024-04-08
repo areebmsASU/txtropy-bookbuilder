@@ -12,7 +12,6 @@ class BookCleaner:
         self.raw_book = raw_book
         self.executor = ThreadPoolExecutor()
         self.executor_futures = []
-        self.chunk_count = 0
         self.changed = False
 
     def refresh(self):
@@ -213,9 +212,6 @@ class BookCleaner:
             if tag.chunk:
                 raise Exception("Tag may not belong to more than one chunk.")
             text.append(tag.contents_text)
-        chunk = Chunk.objects.create(
-            book_gutenberg_id=self.raw_book.id, text=" ".join(text), rel_i=self.chunk_count
-        )
-        self.chunk_count += 1
+        self.raw_book.chunks.create(text=" ".join(text))
         chunk.tags.add(*tags)
         return chunk

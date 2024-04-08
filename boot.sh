@@ -1,15 +1,11 @@
 # Create and activate virtual Env
 sudo apt-get update
-sudo apt install -y python3.10-venv
 sudo apt install -y postgresql
 sudo apt install -y redis
-cd /home/bitnami
-python3 -m venv .venv
-sudo chown -R bitnami .venv/
+python -m venv /home/bitnami/.venv
 
 # Placeholder for vars.
-touch vars.sh
-chmod +x vars.sh
+touch vars.py
 
 # Create git dir
 mkdir bookbuilder.git
@@ -30,14 +26,16 @@ source .venv/bin/activate
 cd bookbuilder
 pip install -r requirements.txt
 deactivate
+sudo /opt/bitnami/ctlscript.sh restart apache
 EOF
 chmod +x /home/bitnami/bookbuilder.git/hooks/post-receive
 
+# Apache Server
 touch /opt/bitnami/apache/conf/vhosts/bookbuilder-http-vhost.conf
 cat > /opt/bitnami/apache/conf/vhosts/bookbuilder-http-vhost.conf <<- "EOF"
 <IfDefine !IS_bookbuilder_LOADED>
     Define IS_bookbuilder_LOADED
-    WSGIDaemonProcess bookbuilder python-home=/opt/bitnami/python python-path=/home/bitnami/bookbuilder
+    WSGIDaemonProcess bookbuilder python-home=/home/bitnami/.venv python-path=/home/bitnami/bookbuilder
 </IfDefine>
 <VirtualHost 127.0.0.1:80 _default_:80>
 ServerAlias *
@@ -55,7 +53,7 @@ touch /opt/bitnami/apache/conf/vhosts/bookbuilder-https-vhost.conf
 cat > /opt/bitnami/apache/conf/vhosts/bookbuilder-https-vhost.conf <<- "EOF"
 <IfDefine !IS_bookbuilder_LOADED>
     Define IS_bookbuilder_LOADED
-    WSGIDaemonProcess bookbuilder python-home=/opt/bitnami/python python-path=/home/bitnami/bookbuilder
+    WSGIDaemonProcess bookbuilder python-home=/home/bitnami/.venv python-path=/home/bitnami/bookbuilder
 </IfDefine>
 <VirtualHost 127.0.0.1:443 _default_:443>
 ServerAlias *
@@ -72,4 +70,6 @@ WSGIScriptAlias / /home/bitnami/bookbuilder/bookbuilder/wsgi.py
 </VirtualHost>
 EOF
 
-sudo /opt/bitnami/ctlscript.sh restart apache
+sudo chown -R bitnami /home/bitnami/.venv
+sudo chown -R bitnami /home/bitnami/bookbuilder
+sudo chown -R bitnami /home/bitnami/bookbuilder.git

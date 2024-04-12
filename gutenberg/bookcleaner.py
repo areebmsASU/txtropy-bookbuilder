@@ -1,3 +1,4 @@
+import requests
 from concurrent.futures import ThreadPoolExecutor, wait
 
 from bs4 import BeautifulSoup
@@ -5,6 +6,8 @@ from bs4.element import NavigableString, Tag as bs4Tag, Comment
 from django.db.transaction import atomic
 
 from gutenberg.models import Text, Tag, Chunk, Book
+
+KEYWORDEXTRACTOR_URL = "http://api.keywordextractor.txtropy.com/"
 
 
 class BookCleaner:
@@ -69,14 +72,22 @@ class BookCleaner:
             self.changed = True
         else:
             raise Exception(f"Tag-Element mismatch. Elements={element_count}; Tags={tag_count}")
+        res = requests.post(
+            f"{KEYWORDEXTRACTOR_URL}book/",
+            {
+                "id": self.raw_book.gutenberg_id,
+                "subject_id": 1301,
+                "title": self.raw_book.metadata["title"][0].strip(),
+                "author": self.raw_book.authors.all().first().name,
+            },
+        ).json()
+        if "error" in res:
+            raise Exception(res["error"])
 
     def chunk(self):
-        if (
-            not self.changed
-            and Chunk.objects.filter(book_gutenberg_id=self.raw_book.gutenberg_id).exists()
-        ):
+        if not self.changed and self.raw_book.chunks.all().exists():
             return
-        Chunk.objects.filter(book_gutenberg_id=self.raw_book.gutenberg_id).delete()
+        self.raw_book.chunks.all().delete()
         self._rec_get_chunks(self.raw_book.body)
         wait(self.executor_futures)
         self.executor.shutdown()
@@ -84,13 +95,13 @@ class BookCleaner:
 
     def clean(self):
         html_map_future = self.executor.submit(self._rec_generate_htmlmap, self.raw_book.body)
-        book = Book.objects.update_or_create(
+        book, created = Book.objects.update_or_create(
             gutenberg_id=self.raw_book.gutenberg_id,
             raw_book=self.raw_book,
             title=self.raw_book.metadata["title"][0].strip(),
             author=self.raw_book.authors.all().first().name,
             html_stylesheet=self.raw_book.html_stylesheet,
-        )[0]
+        )
 
         wait([html_map_future])
         self.executor.shutdown()
@@ -212,6 +223,13 @@ class BookCleaner:
             if tag.chunk:
                 raise Exception("Tag may not belong to more than one chunk.")
             text.append(tag.contents_text)
-        self.raw_book.chunks.create(text=" ".join(text))
+        chunk = self.raw_book.chunks.create(text=" ".join(text))
         chunk.tags.add(*tags)
+        res = requests.post(
+            f"{KEYWORDEXTRACTOR_URL}chunk/",
+            {"id": chunk.id, "book_id": self.raw_book.gutenberg_id, "text": chunk.text},
+        ).json()
+        if "error" in res:
+            raise Exception(res["error"])
+
         return chunk

@@ -20,8 +20,9 @@ def scrape_book(gutenberg_id):
 
 
 @shared_task
-def clean_book(gutenberg_id):
+def async_clean_book(gutenberg_id):
     book_cleaner = BookCleaner(raw_book=RawBook.objects.get(gutenberg_id=gutenberg_id))
+    book_cleaner.refresh()
     book_cleaner.parse()
     book_cleaner.chunk()
     book_cleaner.clean()
@@ -59,5 +60,24 @@ def raw_books(request, subject_id):
     return JsonResponse(data, safe=False)
 
 
-def skip_book(gutenberg_id):
-    pass
+def skip_book(request, gutenberg_id):
+    if request.method == "POST":
+        raw_book = RawBook.objects.get(gutenberg_id=gutenberg_id)
+        raw_book.skip("FORMAT")
+        return JsonResponse({})
+
+
+def clean_book(request, gutenberg_id):
+    if request.method == "POST":
+        try:
+            raw_book = RawBook.objects.get(gutenberg_id=gutenberg_id)
+            raw_book.body = None
+            raw_book.html_stylesheet = None
+            raw_book.chunks.all().delete()
+            if hasattr(raw_book, "book"):
+                raw_book.book.delete()
+            raw_book.save(update_fields=["body", "html_stylesheet"])
+            async_clean_book.delay(gutenberg_id)
+        except Exception as e:
+            raise print(e.args)
+        return JsonResponse({})

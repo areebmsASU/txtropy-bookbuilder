@@ -71,6 +71,7 @@ class RawBook(models.Model):
     def skip(self, reason):
         self.skipped = True
         self.skipped_reason = reason
+        self.book.delete()
         self.save(update_fields=["skipped", "skipped_reason"])
 
     def __str__(self):

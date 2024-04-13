@@ -2,19 +2,18 @@
 sudo apt-get update
 sudo apt install -y postgresql
 sudo apt install -y redis
-python -m venv /home/bitnami/.venv
+/opt/bitnami/python/bin/python3.11 -m venv /home/bitnami/.venv
 
 # Placeholder for vars.
-touch vars.py
+touch /home/bitnami/vars.py
 
 # Create git dir
-mkdir bookbuilder.git
-mkdir bookbuilder
-sudo chown -R bitnami bookbuilder.git/
-sudo chown -R bitnami bookbuilder/
-cd bookbuilder.git
+mkdir /home/bitnami/bookbuilder.git
+mkdir /home/bitnami/bookbuilder
+cd /home/bitnami/bookbuilder.git
 git config --global init.defaultBranch main
 git init --bare
+cd /home/bitnami
 
 # Create post receive
 touch /home/bitnami/bookbuilder.git/hooks/post-receive
@@ -73,3 +72,36 @@ EOF
 sudo chown -R bitnami /home/bitnami/.venv
 sudo chown -R bitnami /home/bitnami/bookbuilder
 sudo chown -R bitnami /home/bitnami/bookbuilder.git
+# celery -A bookbuilder worker -l INFO
+
+
+touch /etc/systemd/system/celery.service
+cat > /etc/systemd/system/celery.service <<- "EOF"
+[Unit]
+Description=Celery Service
+After=network.target
+
+[Service]
+Type=forking
+User=celery
+Group=celery
+EnvironmentFile=/etc/conf.d/celery
+WorkingDirectory=/opt/celery
+ExecStart=/bin/sh -c '${CELERY_BIN} -A $CELERY_APP multi start $CELERYD_NODES \
+    --pidfile=${CELERYD_PID_FILE} --logfile=${CELERYD_LOG_FILE} \
+    --loglevel="${CELERYD_LOG_LEVEL}" $CELERYD_OPTS'
+ExecStop=/bin/sh -c '${CELERY_BIN} multi stopwait $CELERYD_NODES \
+    --pidfile=${CELERYD_PID_FILE} --logfile=${CELERYD_LOG_FILE} \
+    --loglevel="${CELERYD_LOG_LEVEL}"'
+ExecReload=/bin/sh -c '${CELERY_BIN} -A $CELERY_APP multi restart $CELERYD_NODES \
+    --pidfile=${CELERYD_PID_FILE} --logfile=${CELERYD_LOG_FILE} \
+    --loglevel="${CELERYD_LOG_LEVEL}" $CELERYD_OPTS'
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+touch /etc/conf.d/celery
+cat > /etc/conf.d/celery <<- "EOF"
+EOF

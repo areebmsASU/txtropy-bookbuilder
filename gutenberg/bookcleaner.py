@@ -2,7 +2,7 @@ import requests
 from concurrent.futures import ThreadPoolExecutor, wait
 
 from bs4 import BeautifulSoup
-from bs4.element import NavigableString, Tag as bs4Tag, Comment
+from bs4.element import NavigableString, Tag
 from django.db.transaction import atomic
 
 from gutenberg.models import Text, Tag, Chunk, Book

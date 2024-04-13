@@ -75,33 +75,51 @@ sudo chown -R bitnami /home/bitnami/bookbuilder.git
 # celery -A bookbuilder worker -l INFO
 
 
-touch /etc/systemd/system/celery.service
-cat > /etc/systemd/system/celery.service <<- "EOF"
+touch /etc/systemd/system/celeryd.service
+cat > /etc/systemd/system/celeryd.service <<- "EOF"
 [Unit]
 Description=Celery Service
 After=network.target
 
 [Service]
 Type=forking
-User=celery
-Group=celery
-EnvironmentFile=/etc/conf.d/celery
-WorkingDirectory=/opt/celery
-ExecStart=/bin/sh -c '${CELERY_BIN} -A $CELERY_APP multi start $CELERYD_NODES \
-    --pidfile=${CELERYD_PID_FILE} --logfile=${CELERYD_LOG_FILE} \
-    --loglevel="${CELERYD_LOG_LEVEL}" $CELERYD_OPTS'
-ExecStop=/bin/sh -c '${CELERY_BIN} multi stopwait $CELERYD_NODES \
-    --pidfile=${CELERYD_PID_FILE} --logfile=${CELERYD_LOG_FILE} \
-    --loglevel="${CELERYD_LOG_LEVEL}"'
-ExecReload=/bin/sh -c '${CELERY_BIN} -A $CELERY_APP multi restart $CELERYD_NODES \
-    --pidfile=${CELERYD_PID_FILE} --logfile=${CELERYD_LOG_FILE} \
-    --loglevel="${CELERYD_LOG_LEVEL}" $CELERYD_OPTS'
+User=bitnami
+Group=bitnami
+EnvironmentFile=/etc/default/celeryd
+WorkingDirectory=/home/bitnami/bookbuilder
+ExecStart=/bin/sh -c '${CELERY_BIN} multi start ${CELERYD_NODES} -A ${CELERY_APP} --pidfile=${CELERYD_PID_FILE} --logfile=${CELERYD_LOG_FILE} --loglevel=${CELERYD_LOG_LEVEL} ${CELERYD_OPTS}'
+ExecStop=/bin/sh -c '${CELERY_BIN} multi stopwait ${CELERYD_NODES} --pidfile=${CELERYD_PID_FILE}'
+ExecReload=/bin/sh -c '${CELERY_BIN} multi restart ${CELERYD_NODES} -A ${CELERY_APP} --pidfile=${CELERYD_PID_FILE} --logfile=${CELERYD_LOG_FILE} --loglevel=${CELERYD_LOG_LEVEL} ${CELERYD_OPTS}'
 Restart=always
 
 [Install]
 WantedBy=multi-user.target
 EOF
 
-touch /etc/conf.d/celery
-cat > /etc/conf.d/celery <<- "EOF"
+touch /etc/default/celeryd
+cat > /etc/default/celeryd <<- "EOF"
+# The names of the workers. This example create one worker
+CELERYD_NODES="worker1"
+
+# The name of the Celery App, should be the same as the python file
+# where the Celery tasks are defined
+CELERY_APP="bookbuilder"
+
+# Log and PID directories
+CELERYD_LOG_FILE="/var/log/celery/%n%I.log"
+CELERYD_PID_FILE="/var/run/celery/%n.pid"
+
+# Log level
+CELERYD_LOG_LEVEL=INFO
+
+# Path to celery binary, that is in your virtual environment
+CELERY_BIN=/home/bitnami/.venv/bin/celery
 EOF
+
+sudo mkdir /var/log/celery /var/run/celery
+sudo chown bitnami:bitnami /var/log/celery /var/run/celery
+
+sudo systemctl daemon-reload
+sudo systemctl enable celeryd
+sudo systemctl start celeryd
+

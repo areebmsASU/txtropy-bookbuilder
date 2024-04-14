@@ -52,8 +52,9 @@ def raw_books(request, subject_id):
                 "id": raw_book.gutenberg_id,
                 "title": raw_book.metadata and raw_book.metadata["title"][0],
                 "skipped_reason": raw_book.skipped_reason and raw_book.get_skipped_reason_display(),
-                "html_parsed": bool(raw_book.body and raw_book.html_stylesheet),
-                "html_chunked": raw_book.html_chunked,
+                "html_parsed": (
+                    bool(raw_book.body and raw_book.html_stylesheet) and raw_book.html_chunked
+                ),
                 "html_regenerated": hasattr(raw_book, "book") and bool(raw_book.book.html_map),
             }
         )

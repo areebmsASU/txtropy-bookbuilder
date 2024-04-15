@@ -5,7 +5,7 @@ sudo apt install -y redis
 /opt/bitnami/python/bin/python3.11 -m venv /home/bitnami/.venv
 
 # Placeholder for vars.
-touch /home/bitnami/vars.py
+touch /home/bitnami/.env
 
 # Create git dir
 mkdir /home/bitnami/bookbuilder.git
@@ -26,6 +26,10 @@ cd bookbuilder
 pip install -r requirements.txt
 deactivate
 sudo /opt/bitnami/ctlscript.sh restart apache
+sudo systemctl stop celeryd
+sudo systemctl daemon-reload
+sudo systemctl enable celeryd
+sudo systemctl start celeryd
 EOF
 chmod +x /home/bitnami/bookbuilder.git/hooks/post-receive
 
@@ -85,6 +89,7 @@ After=network.target
 Type=forking
 User=bitnami
 Group=bitnami
+EnvironmentFile=/home/bitnami/.env
 EnvironmentFile=/etc/default/celeryd
 WorkingDirectory=/home/bitnami/bookbuilder
 ExecStart=/bin/sh -c '${CELERY_BIN} multi start ${CELERYD_NODES} -A ${CELERY_APP} --pidfile=${CELERYD_PID_FILE} --logfile=${CELERYD_LOG_FILE} --loglevel=${CELERYD_LOG_LEVEL} ${CELERYD_OPTS}'

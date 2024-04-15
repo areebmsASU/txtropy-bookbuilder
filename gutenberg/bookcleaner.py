@@ -73,7 +73,7 @@ class BookCleaner:
         else:
             raise Exception(f"Tag-Element mismatch. Elements={element_count}; Tags={tag_count}")
         res = requests.post(
-            f"{KEYWORDEXTRACTOR_URL}book/",
+            f"{KEYWORDEXTRACTOR_URL}books/",
             {
                 "id": self.raw_book.gutenberg_id,
                 "subject_id": 1301,

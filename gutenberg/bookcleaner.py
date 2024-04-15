@@ -228,7 +228,12 @@ class BookCleaner:
         res = requests.post(
             f"{KEYWORDEXTRACTOR_URL}chunk/",
             {"id": chunk.id, "book_id": self.raw_book.gutenberg_id, "text": chunk.text},
-        ).json()
+        )
+        try:
+            res = res.json()
+        except Exception:
+            print(res)
+            raise
         if "error" in res:
             raise Exception(res["error"])
 

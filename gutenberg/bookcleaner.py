@@ -11,6 +11,20 @@ from gutenberg.models import Text, Tag, Chunk, Book
 KEYWORDEXTRACTOR_URL = "http://api.keywordextractor.txtropy.com"
 
 
+def update_keyword_extractor(raw_book):
+    res = requests.post(
+        f"{KEYWORDEXTRACTOR_URL}/books/",
+        {
+            "id": raw_book.gutenberg_id,
+            "subject_id": 1301,
+            "title": raw_book.metadata["title"][0].strip(),
+            "author": raw_book.authors.all().first().name,
+        },
+    ).json()
+    if "error" in res:
+        raise Exception(res["error"])
+
+
 class BookCleaner:
     def __init__(self, raw_book) -> None:
         self.raw_book = raw_book
@@ -84,17 +98,7 @@ class BookCleaner:
         self.executor = ThreadPoolExecutor()
         self.raw_book.date_chunked = timezone.now()
         self.raw_book.save(update_fields=["date_chunked"])
-        res = requests.post(
-            f"{KEYWORDEXTRACTOR_URL}/books/",
-            {
-                "id": self.raw_book.gutenberg_id,
-                "subject_id": 1301,
-                "title": self.raw_book.metadata["title"][0].strip(),
-                "author": self.raw_book.authors.all().first().name,
-            },
-        ).json()
-        if "error" in res:
-            raise Exception(res["error"])
+        update_keyword_extractor(self.raw_book)
 
     def clean(self):
         html_map_future = self.executor.submit(self._rec_generate_htmlmap, self.raw_book.body)

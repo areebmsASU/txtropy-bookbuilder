@@ -4,7 +4,7 @@ from django.http import JsonResponse
 
 from gutenberg.models import Subject, RawBook
 from gutenberg.bookscraper import BookListScraper, BookScraper
-from gutenberg.bookcleaner import BookCleaner
+from gutenberg.bookcleaner import BookCleaner, update_keyword_extractor
 
 
 @shared_task
@@ -69,6 +69,7 @@ def skip_book(request, gutenberg_id):
     if request.method == "POST":
         raw_book = RawBook.objects.get(gutenberg_id=gutenberg_id)
         raw_book.skip("FORMAT")
+        update_keyword_extractor(raw_book)
         return JsonResponse({})
 
 
@@ -96,7 +97,13 @@ def chunks(request, gutenberg_id):
     if book is None:
         return JsonResponse({"error": "Book not found."}, status=404)
 
-    data = {"chunks": list(book.chunks.filter(pk__gte=i).order_by("id")[:251].values("id", "text"))}
+    data = {
+        "chunks": list(
+            book.chunks.filter(pk__gte=i, raw_book__skipped=False)
+            .order_by("id")[:251]
+            .values("id", "text")
+        )
+    }
 
     if len(data["chunks"]) > 250:
         base_url = request.build_absolute_uri().split("?")[0]

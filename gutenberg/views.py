@@ -5,7 +5,7 @@ from celery import shared_task
 from django.db.models import Count, Exists, OuterRef
 from django.http import JsonResponse
 
-from gutenberg.models import Subject, RawBook, Book, Chunk
+from gutenberg.models import Subject, RawBook, Chunk
 from gutenberg.bookscraper import BookListScraper, BookScraper
 from gutenberg.bookcleaner import BookCleaner
 
@@ -90,3 +90,20 @@ def clean_book(request, gutenberg_id):
         except Exception as e:
             raise print(e.args)
     return JsonResponse({"task": str(task)})
+
+
+def chunks(request, gutenberg_id):
+    i = request.GET.get("i", 0)
+
+    book = RawBook.objects.filter(gutenberg_id=gutenberg_id).first()
+    if book is None:
+        return JsonResponse({"error": "Book not found."}, status=404)
+
+    data = {"chunks": list(book.chunks.filter(pk__gte=i).order_by("id")[:251].values("id", "text"))}
+
+    if len(data["chunks"]) > 250:
+        base_url = request.build_absolute_uri().split("?")[0]
+        next_chunk_id = data["chunks"].pop()["id"]
+        data["next_page"] = f"{base_url}?i={next_chunk_id}"
+
+    return JsonResponse(data)

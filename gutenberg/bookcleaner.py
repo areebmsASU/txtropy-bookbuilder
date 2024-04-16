@@ -7,7 +7,7 @@ from django.db.transaction import atomic
 
 from gutenberg.models import Text, Tag, Chunk, Book
 
-KEYWORDEXTRACTOR_URL = "http://api.keywordextractor.txtropy.com/"
+KEYWORDEXTRACTOR_URL = "http://api.keywordextractor.txtropy.com"
 
 
 class BookCleaner:
@@ -72,17 +72,6 @@ class BookCleaner:
             self.changed = True
         else:
             raise Exception(f"Tag-Element mismatch. Elements={element_count}; Tags={tag_count}")
-        res = requests.post(
-            f"{KEYWORDEXTRACTOR_URL}books/",
-            {
-                "id": self.raw_book.gutenberg_id,
-                "subject_id": 1301,
-                "title": self.raw_book.metadata["title"][0].strip(),
-                "author": self.raw_book.authors.all().first().name,
-            },
-        ).json()
-        if "error" in res:
-            raise Exception(res["error"])
 
     def chunk(self):
         if not self.changed and self.raw_book.chunks.all().exists():
@@ -92,6 +81,17 @@ class BookCleaner:
         wait(self.executor_futures)
         self.executor.shutdown()
         self.executor = ThreadPoolExecutor()
+        res = requests.post(
+            f"{KEYWORDEXTRACTOR_URL}/books/",
+            {
+                "id": self.raw_book.gutenberg_id,
+                "subject_id": 1301,
+                "title": self.raw_book.metadata["title"][0].strip(),
+                "author": self.raw_book.authors.all().first().name,
+            },
+        ).json()
+        if "error" in res:
+            raise Exception(res["error"])
 
     def clean(self):
         html_map_future = self.executor.submit(self._rec_generate_htmlmap, self.raw_book.body)
@@ -225,16 +225,4 @@ class BookCleaner:
             text.append(tag.contents_text)
         chunk = self.raw_book.chunks.create(text=" ".join(text))
         chunk.tags.add(*tags)
-        res = requests.post(
-            f"{KEYWORDEXTRACTOR_URL}chunk/",
-            {"id": chunk.id, "book_id": self.raw_book.gutenberg_id, "text": chunk.text},
-        )
-        try:
-            res = res.json()
-        except Exception:
-            print(res)
-            raise
-        if "error" in res:
-            raise Exception(res["error"])
-
         return chunk

@@ -4,6 +4,7 @@ from concurrent.futures import ThreadPoolExecutor, wait
 from bs4 import BeautifulSoup
 from bs4.element import NavigableString, Tag
 from django.db.transaction import atomic
+from django.utils import timezone
 
 from gutenberg.models import Text, Tag, Chunk, Book
 
@@ -81,6 +82,8 @@ class BookCleaner:
         wait(self.executor_futures)
         self.executor.shutdown()
         self.executor = ThreadPoolExecutor()
+        self.raw_book.date_chunked = timezone.now()
+        self.raw_book.save(update_fields=["date_chunked"])
         res = requests.post(
             f"{KEYWORDEXTRACTOR_URL}/books/",
             {

@@ -60,6 +60,8 @@ class RawBook(models.Model):
     body = models.ForeignKey("Tag", on_delete=models.SET_NULL, null=True, related_name="+")
     html_stylesheet = models.TextField(null=True)
 
+    date_chunked = models.DateTimeField(null=True)
+
     @property
     def metadata_url(self):
         return f"{BASE_URL}/ebooks/{self.gutenberg_id}/"
@@ -110,6 +112,7 @@ class Book(models.Model):
     author = models.TextField()
     html_map = models.JSONField(null=True)
     html_stylesheet = models.TextField(null=True)
+    last_modified = models.DateTimeField(auto_now=True)
 
     def __str__(self):
         return f"Book {self.gutenberg_id}: {self.title}"

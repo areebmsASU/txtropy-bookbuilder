@@ -1,11 +1,8 @@
-import os
-import json
-
 from celery import shared_task
-from django.db.models import Count, Exists, OuterRef
+from django.db.models import Count
 from django.http import JsonResponse
 
-from gutenberg.models import Subject, RawBook, Chunk
+from gutenberg.models import Subject, RawBook
 from gutenberg.bookscraper import BookListScraper, BookScraper
 from gutenberg.bookcleaner import BookCleaner
 
@@ -53,7 +50,7 @@ def raw_books(request, subject_id):
         Subject.objects.get(gutenberg_id=subject_id)
         .raw_books.annotate(chunk_count=Count("chunks"))
         .select_related("book")
-        .order_by("gutenberg_id", "skipped")
+        .order_by("skipped", "gutenberg_id")
     ):
         data.append(
             {

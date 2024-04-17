@@ -68,7 +68,7 @@ def raw_books(request, subject_id):
 def skip_book(request, gutenberg_id):
     if request.method == "POST":
         raw_book = RawBook.objects.get(gutenberg_id=gutenberg_id)
-        raw_book.skip("FORMAT")
+        raw_book.skip("CHUNKS")
         update_keyword_extractor(raw_book)
         return JsonResponse({})
 

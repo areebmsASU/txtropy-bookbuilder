@@ -38,6 +38,7 @@ class RawBook(models.Model):
         "FORMAT": "Not a text",
         "LANG": "Not English",
         "DUPLICATE": "Already Exists",
+        "CHUNKS": "Chunking Edge Case",
     }
 
     date_created = models.DateTimeField(auto_now_add=True)

@@ -45,47 +45,49 @@ def subjects(request):
 
 
 def subject_status(request, subject_id):
-    status = []
-    skipped = []
+    ids = []
+    skipped_ids = []
+    chunk_counts = {}
+    titles = {}
+    scraped = {}
+    cleaned = {}
+    skipped_reason = {}
     for raw_book in (
         Subject.objects.get(gutenberg_id=subject_id)
         .raw_books.annotate(chunk_count=Count("chunks"))
         .select_related("book")
         .order_by("skipped", "gutenberg_id")
     ):
-        if not hasattr(raw_book, "book"):
-            title = raw_book.metadata and raw_book.metadata["title"][0]
-            cleaned = False
-        else:
-            title = raw_book.book.title
-            cleaned = (
-                bool(raw_book.book.html_map)
-                and bool(raw_book.book.html_stylesheet)
-                and raw_book.book.last_modified.date()
-            )
-        if not raw_book.skipped_reason:
-            status.append(
-                {
-                    "id": raw_book.gutenberg_id,
-                    "title": title,
-                    "scraped": raw_book.text_retrieved_date and raw_book.text_retrieved_date.date(),
-                    "cleaned": cleaned,
-                    "chunks": raw_book.chunk_count,
-                }
-            )
-        else:
-            skipped.append(
-                {
-                    "id": raw_book.gutenberg_id,
-                    "title": title,
-                    "scraped": raw_book.text_retrieved_date and raw_book.text_retrieved_date.date(),
-                    "chunks": raw_book.chunk_count,
-                    "cleaned": cleaned,
-                    "skipped_reason": raw_book.get_skipped_reason_display(),
-                }
-            )
 
-    return JsonResponse({"status": status, "skipped": skipped})
+        cleaned[raw_book.gutenberg_id] = (
+            hasattr(raw_book, "book")
+            and bool(raw_book.book.html_map)
+            and bool(raw_book.book.html_stylesheet)
+            and raw_book.book.last_modified.date()
+        )
+        chunk_counts[raw_book.gutenberg_id] = raw_book.chunk_count
+        titles[raw_book.gutenberg_id] = raw_book.metadata and raw_book.metadata["title"][0]
+        scraped[raw_book.gutenberg_id] = (
+            raw_book.text_retrieved_date and raw_book.text_retrieved_date.date()
+        )
+
+        if not raw_book.skipped_reason:
+            ids.append(raw_book.gutenberg_id)
+        else:
+            skipped_reason[raw_book.gutenberg_id] = raw_book.get_skipped_reason_display()
+            skipped_ids.append(raw_book.gutenberg_id)
+
+    return JsonResponse(
+        {
+            "ids": ids,
+            "skipped": skipped_ids,
+            "title": titles,
+            "scraped": scraped,
+            "cleaned": cleaned,
+            "chunk_count": chunk_counts,
+            "skipped_reason": skipped_reason,
+        }
+    )
 
 
 def skip_book(request, gutenberg_id):
